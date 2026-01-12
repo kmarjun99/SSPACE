@@ -52,6 +52,12 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 10080
       ENVIRONMENT: ${ENVIRONMENT:-development}
       REDIS_URL: redis://redis:6379
+      # Email Configuration
+      mail_username: ${mail_username}
+      mail_password: ${mail_password}
+      mail_from: ${mail_from:-StudySpace <noreply@studyspace.com>}
+      mail_port: ${mail_port:-587}
+      mail_server: ${mail_server:-smtp.gmail.com}
     depends_on:
       postgres:
         condition: service_healthy

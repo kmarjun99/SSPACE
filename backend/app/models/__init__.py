@@ -27,3 +27,6 @@ from app.models.boost_request import BoostRequest, BoostRequestStatus, VenueType
 
 # Subscription Plans
 from app.models.subscription_plan import SubscriptionPlan
+
+# OTP & Password Reset
+from app.models.otp import OTP, PasswordReset

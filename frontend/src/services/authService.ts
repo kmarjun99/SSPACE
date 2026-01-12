@@ -38,5 +38,50 @@ export const authService = {
             name
         });
         return response.data;
+    },
+
+    // OTP Methods
+    sendOtp: async (email: string, phone: string | null, otpType: string) => {
+        const response = await api.post('/otp/send', {
+            email,
+            phone,
+            otp_type: otpType
+        });
+        return response.data;
+    },
+
+    verifyOtp: async (email: string, otpCode: string, otpType: string) => {
+        const response = await api.post('/otp/verify', {
+            email,
+            otp_code: otpCode,
+            otp_type: otpType
+        });
+        return response.data;
+    },
+
+    resendOtp: async (email: string, phone: string | null, otpType: string) => {
+        const response = await api.post('/otp/resend', {
+            email,
+            phone,
+            otp_type: otpType
+        });
+        return response.data;
+    },
+
+    // Password Reset Methods
+    forgotPassword: async (email: string) => {
+        const response = await api.post('/otp/forgot-password', {
+            email
+        });
+        return response.data;
+    },
+
+    resetPassword: async (email: string, otpCode: string, newPassword: string) => {
+        const response = await api.post('/otp/reset-password', {
+            email,
+            otp_code: otpCode,
+            new_password: newPassword
+        });
+        return response.data;
     }
 };

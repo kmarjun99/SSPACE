@@ -5,7 +5,7 @@ import { UserRole } from '../types';
 import { Button, Input, Card } from '../components/UI';
 import { Logo } from '../components/Logo';
 
-import { BookOpen, Mail, Lock, User as UserIcon, Eye, EyeOff, CheckCircle, XCircle, Shield, Phone } from 'lucide-react';
+import { BookOpen, Mail, Lock, User as UserIcon, Eye, EyeOff, CheckCircle, XCircle, Shield } from 'lucide-react';
 import { authService } from '../services/authService';
 import { validateEmail, validatePassword } from '../utils/security';
 
@@ -20,7 +20,6 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
 
   const [role, setRole] = useState<UserRole>(UserRole.STUDENT);
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +30,6 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
   const [emailError, setEmailError] = useState<string>('');
   const [emailTouched, setEmailTouched] = useState(false);
   const [isEmailValid, setIsEmailValid] = useState(false);
-  
-  // Phone validation states
-  const [phoneError, setPhoneError] = useState<string>('');
-  const [phoneTouched, setPhoneTouched] = useState(false);
-  const [isPhoneValid, setIsPhoneValid] = useState(false);
   
   // Password validation states
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
@@ -49,6 +43,14 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [otpType, setOtpType] = useState<string>('registration'); // 'registration' or 'password_reset'
+  
+  // Forgot password states
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   // Auto-fill removed to allow manual demo credential selection
   // useEffect(() => {
@@ -73,21 +75,6 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
       }
     }
   }, [email, emailTouched]);
-
-  // Real-time phone validation
-  useEffect(() => {
-    if (phone && phoneTouched) {
-      // Indian phone number format: 10 digits starting with 6-9
-      const phoneRegex = /^[6-9]\d{9}$/;
-      if (!phoneRegex.test(phone)) {
-        setPhoneError('Please enter a valid 10-digit phone number');
-        setIsPhoneValid(false);
-      } else {
-        setPhoneError('');
-        setIsPhoneValid(true);
-      }
-    }
-  }, [phone, phoneTouched]);
 
   // Real-time password validation
   useEffect(() => {
@@ -116,16 +103,8 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
       return;
     }
 
-    // Validate phone number for registration
+    // Validate password strength for registration
     if (isRegister) {
-      const phoneRegex = /^[6-9]\d{9}$/;
-      if (!phoneRegex.test(phone)) {
-        setPhoneError('Please enter a valid 10-digit phone number');
-        setPhoneTouched(true);
-        return;
-      }
-
-      // Validate password strength
       const validation = validatePassword(password);
       if (!validation.isValid) {
         setPasswordErrors(validation.errors);
@@ -141,11 +120,13 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
       let data;
       if (isRegister) {
         await authService.register(email, password, role, name);
-        // After register, login immediately
-        data = await authService.login(email, password);
         
-        // Show OTP verification for new registrations
+        // Send OTP for registration via email only
+        await authService.sendOtp(email, null, 'registration');
+        
+        // Show OTP verification modal
         setShowOtpModal(true);
+        setOtpType('registration');
         setOtpSent(true);
         setResendTimer(60);
         setIsLoading(false);
@@ -167,8 +148,21 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
     } catch (err: any) {
       console.error('Authentication failed:', err);
       const detail = err.response?.data?.detail;
+      
+      // Log full error for debugging
+      console.log('Error response:', err.response?.data);
+      
       if (detail) {
-        setError(typeof detail === 'string' ? detail : JSON.stringify(detail));
+        // Handle specific registration errors
+        if (typeof detail === 'string') {
+          if (detail.includes('already exists')) {
+            setError('This email is already registered. Please login or use a different email.');
+          } else {
+            setError(detail);
+          }
+        } else {
+          setError(JSON.stringify(detail));
+        }
       } else if (!err.response) {
         setError('Cannot connect to server. Ensure you are using the correct local IP.');
       } else {
@@ -215,11 +209,15 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
     setOtpError('');
 
     try {
-      // Simulate OTP verification (replace with actual API call)
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // For demo, accept any 6-digit OTP or '123456'
-      if (otpCode === '123456' || otpCode.length === 6) {
+      if (otpType === 'password_reset') {
+        // Verify OTP for password reset
+        await authService.verifyOtp(forgotPasswordEmail, otpCode, 'password_reset');
+        setShowOtpModal(false);
+        setShowResetPassword(true);
+      } else {
+        // Verify OTP for registration
+        await authService.verifyOtp(email, otpCode, 'registration');
+        
         // Complete login after OTP verification
         const data = await authService.login(email, password);
         if (data && data.access_token) {
@@ -232,11 +230,10 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
           setShowOtpModal(false);
           onLogin(user.email, userRoleToPass, user);
         }
-      } else {
-        setOtpError('Invalid OTP. Please try again.');
       }
-    } catch (err) {
-      setOtpError('Verification failed. Please try again.');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Verification failed. Please try again.';
+      setOtpError(errorMsg);
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -246,9 +243,84 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
     setResendTimer(60);
     setOtp(['', '', '', '', '', '']);
     setOtpError('');
-    // Simulate sending OTP
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setOtpSent(true);
+    
+    try {
+      const emailToUse = otpType === 'password_reset' ? forgotPasswordEmail : email;
+      
+      await authService.resendOtp(emailToUse, null, otpType);
+      setOtpSent(true);
+    } catch (err: any) {
+      setOtpError('Failed to resend OTP. Please try again.');
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!forgotPasswordEmail || !validateEmail(forgotPasswordEmail)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await authService.forgotPassword(forgotPasswordEmail);
+      setShowForgotPassword(false);
+      setShowOtpModal(true);
+      setOtpType('password_reset');
+      setOtpSent(true);
+      setResendTimer(60);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to send reset code. Please try again.';
+      setError(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (resetNewPassword.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    if (resetNewPassword !== confirmNewPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    const validation = validatePassword(resetNewPassword);
+    if (!validation.isValid) {
+      setError(validation.errors.join('. '));
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const otpCode = otp.join('');
+      await authService.resetPassword(forgotPasswordEmail, otpCode, resetNewPassword);
+      
+      setShowResetPassword(false);
+      setOtp(['', '', '', '', '', '']);
+      setForgotPasswordEmail('');
+      setResetNewPassword('');
+      setConfirmNewPassword('');
+      setError(null);
+      
+      // Show success message
+      alert('Password reset successful! You can now log in with your new password.');
+      
+      // Pre-fill email for login
+      setEmail(forgotPasswordEmail);
+      setPassword('');
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Failed to reset password. Please try again.';
+      setError(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
 
@@ -338,59 +410,10 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
                   />
                 </div>
               </div>
-
-              <div className="relative group animate-in slide-in-from-left fade-in duration-500 delay-450">
-                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5 ml-1 block">Phone Number</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Phone className="h-5 w-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
-                  </div>
-                  <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
-                  {phoneTouched && phone && (
-                    isPhoneValid ? (
-                      <CheckCircle className="h-5 w-5 text-green-500 animate-in zoom-in duration-300" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500 animate-in zoom-in duration-300" />
-                    )
-                  )}
-                </div>
-                <Input
-                  type="tel"
-                  placeholder="9876543210"
-                  maxLength={10}
-                  className={`pl-11 pr-11 h-12 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200 focus:bg-white focus:ring-2 placeholder:text-gray-400 transition-all duration-300 hover:border-gray-300 ${
-                    phoneTouched && phoneError 
-                      ? 'border-red-300 focus:border-red-400 focus:ring-red-500/30' 
-                      : phoneTouched && isPhoneValid
-                      ? 'border-green-300 focus:border-green-400 focus:ring-green-500/30'
-                      : 'focus:ring-indigo-500/30 focus:border-indigo-400'
-                  }`}
-                  value={phone}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, ''); // Only allow digits
-                    setPhone(value);
-                  }}
-                  onBlur={() => setPhoneTouched(true)}
-                  required={isRegister}
-                />
-                </div>
-                {phoneTouched && phoneError && (
-                  <p className="text-xs text-red-600 mt-1.5 ml-1 flex items-center gap-1 animate-in slide-in-from-top-1 fade-in duration-200">
-                    <XCircle className="h-3 w-3" />
-                    {phoneError}
-                  </p>
-                )}
-                {phoneTouched && isPhoneValid && (
-                  <p className="text-xs text-green-600 mt-1.5 ml-1 flex items-center gap-1 animate-in slide-in-from-top-1 fade-in duration-200">
-                    <CheckCircle className="h-3 w-3" />
-                    Valid phone number
-                  </p>
-                )}
-              </div>
             </>
           )}
 
-          <div className={`relative group ${isRegister ? 'animate-in slide-in-from-left fade-in duration-500 delay-500' : 'animate-in slide-in-from-left fade-in duration-500 delay-300'}`}>
+          <div className={`relative group ${isRegister ? 'animate-in slide-in-from-left fade-in duration-500 delay-450' : 'animate-in slide-in-from-left fade-in duration-500 delay-300'}`}>
             <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5 ml-1 block">Email Address</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -511,7 +534,11 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
 
           {!isRegister && (
             <div className="flex justify-end pt-1 animate-in fade-in duration-500 delay-500">
-              <button type="button" className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold transition-colors hover:underline">
+              <button 
+                type="button" 
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold transition-colors hover:underline"
+              >
                 Forgot password?
               </button>
             </div>
@@ -620,14 +647,8 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
                 We've sent a 6-digit code to<br />
                 <span className="font-semibold text-indigo-600 flex items-center justify-center gap-2 mt-1">
                   <Mail className="w-4 h-4" />
-                  {email}
+                  {otpType === 'password_reset' ? forgotPasswordEmail : email}
                 </span>
-                {phone && (
-                  <span className="font-semibold text-purple-600 flex items-center justify-center gap-2 mt-1">
-                    <Phone className="w-4 h-4" />
-                    +91 {phone}
-                  </span>
-                )}
               </p>
             </div>
 
@@ -661,10 +682,13 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
                 </div>
               )}
 
-              {/* Demo OTP Info */}
-              <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-3 text-center mb-4">
-                <p className="text-xs text-amber-800 font-medium">
-                  🎯 Demo Mode: Use OTP <span className="font-bold">123456</span>
+              {/* Development Mode Info - Only show if email not configured */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 mb-4">
+                <p className="text-xs text-blue-800 font-medium text-center">
+                  📧 Check your email for the 6-digit verification code
+                </p>
+                <p className="text-xs text-blue-600 mt-1 text-center">
+                  Didn't receive it? Click "Resend OTP" below
                 </p>
               </div>
             </div>
@@ -705,6 +729,179 @@ export const AuthPage: React.FC<AuthProps> = ({ onLogin }) => {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && !showOtpModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in duration-300">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full mb-4">
+                <Mail className="h-8 w-8 text-indigo-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Reset Password</h2>
+              <p className="text-sm text-gray-600">
+                Enter your email address and we'll send you an OTP to reset your password
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5 ml-1 block">
+                  Email Address
+                </label>
+                <Input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                  className="h-12 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                />
+              </div>
+
+              <Button
+                onClick={handleForgotPassword}
+                className="w-full h-12 rounded-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg"
+                disabled={!forgotPasswordEmail || !validateEmail(forgotPasswordEmail)}
+              >
+                Send OTP
+              </Button>
+
+              <button
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setForgotPasswordEmail('');
+                }}
+                className="w-full text-sm text-gray-500 hover:text-gray-700 font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Reset Form */}
+      {showResetPassword && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in duration-300">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full mb-4">
+                <Lock className="h-8 w-8 text-green-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Create New Password</h2>
+              <p className="text-sm text-gray-600">
+                Enter your new password below
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5 ml-1 block">
+                  New Password
+                </label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    className="h-12 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 pr-11"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-indigo-600 focus:outline-none transition-colors"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5 ml-1 block">
+                  Confirm New Password
+                </label>
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  className="h-12 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                />
+                {confirmNewPassword && resetNewPassword !== confirmNewPassword && (
+                  <p className="text-xs text-red-600 mt-1.5 ml-1 flex items-center gap-1">
+                    <XCircle className="h-3 w-3" />
+                    Passwords do not match
+                  </p>
+                )}
+                {confirmNewPassword && resetNewPassword === confirmNewPassword && (
+                  <p className="text-xs text-green-600 mt-1.5 ml-1 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    Passwords match
+                  </p>
+                )}
+              </div>
+
+              {/* Password Requirements */}
+              {resetNewPassword && (
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">
+                    Password Requirements
+                  </p>
+                  <ul className="space-y-1.5">
+                    {[
+                      { test: resetNewPassword.length >= 8, text: 'At least 8 characters' },
+                      { test: /[A-Z]/.test(resetNewPassword), text: 'One uppercase letter' },
+                      { test: /[a-z]/.test(resetNewPassword), text: 'One lowercase letter' },
+                      { test: /\d/.test(resetNewPassword), text: 'One number' },
+                      { test: /[!@#$%^&*(),.?":{}|<>]/.test(resetNewPassword), text: 'One special character' },
+                    ].map((req, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-xs">
+                        {req.test ? (
+                          <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                        ) : (
+                          <div className="h-3.5 w-3.5 rounded-full border-2 border-gray-300 flex-shrink-0" />
+                        )}
+                        <span className={req.test ? 'text-green-700' : 'text-gray-600'}>{req.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded-lg text-sm">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4" />
+                    <span>{error}</span>
+                  </div>
+                </div>
+              )}
+
+              <Button
+                onClick={handleResetPassword}
+                className="w-full h-12 rounded-xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg"
+                disabled={!resetNewPassword || !confirmNewPassword || resetNewPassword !== confirmNewPassword || !validatePassword(resetNewPassword).isValid}
+                isLoading={isLoading}
+              >
+                Reset Password
+              </Button>
+
+              <button
+                onClick={() => {
+                  setShowResetPassword(false);
+                  setResetNewPassword('');
+                  setConfirmNewPassword('');
+                  setError(null);
+                }}
+                className="w-full text-sm text-gray-500 hover:text-gray-700 font-medium"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
