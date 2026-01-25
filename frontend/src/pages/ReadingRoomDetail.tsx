@@ -259,6 +259,13 @@ export const ReadingRoomDetail: React.FC<ReadingRoomDetailProps> = ({
                                     <span className="text-sm font-medium">Call Venue</span>
                                 </a>
                             )}
+                            <button
+                                onClick={() => navigate(`/student/messages?owner=${venue.ownerId}&venue=${venue.id}`)}
+                                className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200 hover:bg-indigo-100 transition-colors"
+                            >
+                                <MessageCircle className="w-4 h-4" />
+                                <span className="text-sm font-medium">Message Owner</span>
+                            </button>
 
                         </div>
                     </div>

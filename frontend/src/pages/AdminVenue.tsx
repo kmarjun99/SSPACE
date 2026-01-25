@@ -1,6 +1,7 @@
 ﻿
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 import { AppState, ReadingRoom, Cabin, CabinStatus, ListingStatus, PromotionPlan, PromotionRequest } from '../types';
 import { Card, Button, Input, Badge, Modal, LiveIndicator } from '../components/UI';
@@ -9,6 +10,7 @@ import { venueService } from '../services/venueService';
 import { trustService, VenueTrustStatus } from '../services/trustService';
 import { boostService, BoostPlan, BoostRequest } from '../services/boostService';
 import { LocationSelector, LocationData } from '../components/LocationSelector';
+import { OwnerListingPayment } from '../components/OwnerListingPayment';
 
 interface AdminVenueProps {
     state: AppState;
@@ -130,13 +132,25 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
             imageUrl: images[0] || venueFormData.imageUrl // fallback
         };
 
-        if (!venue) {
-            await onCreateRoom(dataToSave);
-        } else {
-            await onUpdateRoom(dataToSave);
-        }
+        try {
+            if (!venue) {
+                await onCreateRoom(dataToSave);
+                toast.success('Venue created successfully!');
+            } else {
+                await onUpdateRoom(dataToSave);
+                toast.success('Changes saved successfully!');
+            }
 
-        if (nextStep) setStep(nextStep);
+            if (nextStep) {
+                setStep(nextStep);
+            } else if (isLive) {
+                // In live mode, refresh to show updated data
+                setTimeout(() => window.location.reload(), 500);
+            }
+        } catch (error) {
+            toast.error('Failed to save changes. Please try again.');
+            console.error('Save error:', error);
+        }
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,12 +172,24 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
     const handleProceedToPayment = () => {
+        // Check if payment already completed
+        if (venue?.paymentId) {
+            alert("Payment has already been completed for this venue. Your venue is under verification.");
+            return;
+        }
+        
         // Validate
         if (images.length < 4) {
             alert("Please upload at least 4 images before proceeding.");
             return;
         }
         setIsPaymentModalOpen(true);
+    };
+
+    const handlePaymentSuccess = () => {
+        setIsPaymentModalOpen(false);
+        // Refresh the page to show updated status
+        setTimeout(() => window.location.reload(), 1000);
     };
 
     const handleConfirmPayment = async () => {
@@ -207,6 +233,7 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
     const [activePromotionPlans, setActivePromotionPlans] = useState<BoostPlan[]>([]);
     const [myBoostRequests, setMyBoostRequests] = useState<BoostRequest[]>([]);
     const [isLoadingPlans, setIsLoadingPlans] = useState(false);
+    const [customAmenity, setCustomAmenity] = useState('');
 
     useEffect(() => {
         const loadBoostData = async () => {
@@ -405,7 +432,58 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
                                 <span className="text-sm text-gray-700">{opt}</span>
                             </label>
                         ))}
+                        {/* Display custom amenities */}
+                        {venueFormData.amenities?.filter(a => !AMENITY_OPTIONS.includes(a)).map(customAmenity => (
+                            <label key={customAmenity} className={`flex items-center space-x-2 cursor-pointer p-2 border rounded-md bg-indigo-50 ${isReadOnly ? 'bg-gray-100' : 'hover:bg-indigo-100'}`}>
+                                <input type="checkbox"
+                                    checked={true}
+                                    onChange={() => {
+                                        if (isReadOnly) return;
+                                        const current = venueFormData.amenities || [];
+                                        setVenueFormData({ ...venueFormData, amenities: current.filter(a => a !== customAmenity) });
+                                    }}
+                                    disabled={isReadOnly}
+                                    className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                />
+                                <span className="text-sm text-indigo-700 font-medium">{customAmenity}</span>
+                            </label>
+                        ))}
                     </div>
+                    {/* Add custom amenity input */}
+                    {!isReadOnly && (
+                        <div className="mt-3 flex gap-2">
+                            <input
+                                type="text"
+                                placeholder="Add your own amenity"
+                                value={customAmenity}
+                                onChange={(e) => setCustomAmenity(e.target.value)}
+                                onKeyPress={(e) => {
+                                    if (e.key === 'Enter' && customAmenity.trim()) {
+                                        const current = venueFormData.amenities || [];
+                                        if (!current.includes(customAmenity.trim())) {
+                                            setVenueFormData({ ...venueFormData, amenities: [...current, customAmenity.trim()] });
+                                            setCustomAmenity('');
+                                        }
+                                    }
+                                }}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                            />
+                            <Button
+                                size="sm"
+                                onClick={() => {
+                                    if (customAmenity.trim()) {
+                                        const current = venueFormData.amenities || [];
+                                        if (!current.includes(customAmenity.trim())) {
+                                            setVenueFormData({ ...venueFormData, amenities: [...current, customAmenity.trim()] });
+                                            setCustomAmenity('');
+                                        }
+                                    }
+                                }}
+                            >
+                                Add
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </div>
             {!isReadOnly && (
@@ -900,14 +978,14 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
                         </div>
                     ) : existingRequest ? (
                         <div className="text-center py-8">
-                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${existingRequest.status === 'APPROVED' ? 'bg-green-100' : 'bg-yellow-100'}`}>
-                                <CheckCircle className={`w-8 h-8 ${existingRequest.status === 'APPROVED' ? 'text-green-600' : 'text-yellow-600'}`} />
+                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${existingRequest.status === 'approved' ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                                <CheckCircle className={`w-8 h-8 ${existingRequest.status === 'approved' ? 'text-green-600' : 'text-yellow-600'}`} />
                             </div>
                             <h3 className="text-lg font-bold text-gray-900 mb-2">
-                                {existingRequest.status === 'APPROVED' ? 'Promotion Active!' : 'Request Pending Approval'}
+                                {existingRequest.status === 'approved' ? 'Promotion Active!' : 'Request Pending Approval'}
                             </h3>
                             <p className="text-gray-600">
-                                {existingRequest.status === 'APPROVED'
+                                {existingRequest.status === 'approved'
                                     ? `Your venue is featured until ${existingRequest.expiryDate ? new Date(existingRequest.expiryDate).toLocaleDateString() : 'N/A'}`
                                     : 'Your promotion request is awaiting Super Admin approval.'}
                             </p>
@@ -940,7 +1018,7 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
                                             <h4 className="font-bold text-gray-900">{plan.name}</h4>
                                             <p className="text-xs text-gray-500">{plan.description || `${plan.durationDays} days of featured listing`}</p>
                                         </div>
-                                        <span className="text-lg font-bold text-indigo-700">₹{plan.price}</span>
+                                        <span className="text-lg font-bold text-indigo-700">₹{plan.price}<span className="text-xs text-gray-500"> + GST</span></span>
                                     </div>
                                 ))}
                             </div>
@@ -951,7 +1029,7 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
                                 isLoading={isProcessingBoost}
                                 disabled={isProcessingBoost || !selectedPlan}
                             >
-                                {isProcessingBoost ? 'Processing Payment...' : `Pay ₹${selectedPlan?.price || 0} & Submit Request`}
+                                {isProcessingBoost ? 'Processing Payment...' : `Pay ₹${selectedPlan?.price || 0} + GST & Submit Request`}
                             </Button>
                             <p className="text-xs text-center text-gray-400 mt-2">Secure payment via Razorpay - Requires admin approval</p>
                         </div>
@@ -981,44 +1059,16 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
 
             {step === 3 && renderCabinsManager(true, false)}
 
-            {/* Payment Modal - Uses Super Admin configured subscription plans (no hardcoding) */}
-            <Modal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} title="Select Subscription Plan">
-                <div className="space-y-4">
-                    {/* Dynamic plans from Super Admin configuration */}
-                    {(state.subscriptionPlans || []).filter(p => p.isActive).length === 0 ? (
-                        <div className="text-center py-8">
-                            <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                            <h3 className="text-lg font-bold text-gray-700 mb-2">No Plans Available</h3>
-                            <p className="text-gray-500">Subscription plans are not configured yet. Please contact support.</p>
-                        </div>
-                    ) : (
-                        <>
-                            {(state.subscriptionPlans || []).filter(p => p.isActive).map((plan, idx) => (
-                                <div
-                                    key={plan.id}
-                                    className={`p-4 border rounded-lg cursor-pointer transition-all ${idx === 0 ? 'border-indigo-200 bg-indigo-50 ring-2 ring-indigo-500' : 'border-gray-200 hover:border-indigo-300'}`}
-                                >
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h4 className="font-bold text-indigo-900">{plan.name}</h4>
-                                        <span className="text-lg font-bold text-indigo-700">
-                                            ₹{plan.price}<span className="text-xs text-indigo-500">/{plan.durationDays} days</span>
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-indigo-700">{plan.description || 'Standard listing features'}</p>
-                                </div>
-                            ))}
-                            <Button
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3"
-                                onClick={handleConfirmPayment}
-                                disabled={submitting || (state.subscriptionPlans || []).filter(p => p.isActive).length === 0}
-                            >
-                                {submitting ? 'Processing...' : `Pay ₹${(state.subscriptionPlans || []).find(p => p.isActive)?.price || 0} & Submit for Approval`}
-                            </Button>
-                            <p className="text-xs text-center text-gray-500">Secure payment via Razorpay - Requires Super Admin approval</p>
-                        </>
-                    )}
-                </div>
-            </Modal>
+            {/* Payment Modal - Uses New OwnerListingPayment Component with Razorpay Integration */}
+            <OwnerListingPayment
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                venueId={venue?.id || ''}
+                venueName={venue?.name || 'Your Venue'}
+                venueType="reading_room"
+                subscriptionPlans={(state.subscriptionPlans || []).filter(p => p.isActive)}
+                onSuccess={handlePaymentSuccess}
+            />
 
             {renderSharedModals()}
         </div>

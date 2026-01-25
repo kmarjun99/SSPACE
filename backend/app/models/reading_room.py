@@ -60,6 +60,11 @@ class ReadingRoom(Base):
     # NEW: Reference to master locations table
     location_id = Column(String, ForeignKey("locations.id"), nullable=True, index=True)
     
+    # Payment & Subscription tracking
+    subscription_plan_id = Column(String, ForeignKey("subscription_plans.id"), nullable=True)
+    payment_id = Column(String, nullable=True)  # Razorpay payment ID
+    payment_date = Column(DateTime, nullable=True)
+    
     # Submission timestamp
     created_at = Column(DateTime, default=datetime.utcnow)
 

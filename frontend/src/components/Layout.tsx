@@ -22,7 +22,8 @@ import {
   LineChart,
   DollarSign,
   HelpCircle,
-  Zap
+  Zap,
+  MessageCircle
 } from 'lucide-react';
 import { User, UserRole, Notification } from '../types';
 
@@ -69,6 +70,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, notifi
       { name: 'My Listings', href: '/admin/listings', icon: Building2 },
       { name: 'Students', href: '/admin/students', icon: Users },
       { name: 'Financials', href: '/admin/financials', icon: CreditCard },
+      { name: 'Messages', href: '/admin/messages', icon: MessageCircle },
     ];
 
   } else {
@@ -77,6 +79,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, notifi
       { name: 'Book Cabin', href: '/student/book', icon: BookOpen },
       { name: 'Find PG/Hostel', href: '/student/accommodation', icon: Home },
       { name: 'Payments', href: '/student/payments', icon: CreditCard },
+      { name: 'Messages', href: '/student/messages', icon: MessageCircle },
     ];
   }
 

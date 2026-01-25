@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.database import engine, Base
 # from app.database import engine, Base # Duplicate removed
-from app.routers import auth, reading_rooms, cabins, bookings, accommodations, waitlist, ads, ad_categories, locations, admin_cities, users, reviews, inquiries, trust, payments, reset, invoices, boost, cache, subscriptions, favorites, razorpay, otp
+from app.routers import auth, reading_rooms, cabins, bookings, accommodations, waitlist, ads, ad_categories, locations, admin_cities, users, reviews, inquiries, trust, payments, reset, invoices, boost, cache, subscriptions, favorites, razorpay, otp, venue_payments, messages, notifications
 from app.models.inquiry import Inquiry  # Ensure table is created
 from app.models.trust_flag import TrustFlag  # Ensure trust tables are created
 from app.models.reminder import Reminder
@@ -94,6 +94,9 @@ app.include_router(reset.router)  # Admin Database Reset
 app.include_router(invoices.router)  # Invoice PDF Generation
 app.include_router(boost.router)  # Boost Plans & Requests
 app.include_router(subscriptions.router)  # Subscription Plans for Venue Listings
+app.include_router(venue_payments.router)  # Venue Subscription Payments
+app.include_router(messages.router)  # Messaging between users and owners
+app.include_router(notifications.router)  # Notifications system
 app.include_router(cache.router)  # Cache Management (Super Admin)
 # Database Tables Creation (For simple setup)
 @app.on_event("startup")

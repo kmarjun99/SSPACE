@@ -44,10 +44,18 @@ export const OwnerBilling: React.FC<OwnerBillingProps> = ({ state, user }) => {
         const renewalDate = new Date();
         renewalDate.setMonth(renewalDate.getMonth() + 1);
 
+        // Derive billing cycle from duration days
+        const getBillingCycle = (days?: number) => {
+            if (!days) return 'MONTHLY';
+            if (days <= 30) return 'MONTHLY';
+            if (days <= 90) return 'QUARTERLY';
+            return 'YEARLY';
+        };
+
         return {
             planStartDate: startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
             renewalDate: renewalDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-            billingCycle: currentPlan?.billingCycle || 'MONTHLY',
+            billingCycle: getBillingCycle(currentPlan?.durationDays),
             status: 'ACTIVE' as const,
             invoices: [
                 { id: 'INV-001', date: startDate.toLocaleDateString(), amount: currentPlan?.price || 999, status: 'PAID' },
@@ -174,7 +182,7 @@ export const OwnerBilling: React.FC<OwnerBillingProps> = ({ state, user }) => {
                                         <h4 className="font-bold text-gray-900">{plan.name}</h4>
                                         <p className="text-sm text-gray-500">{plan.description}</p>
                                     </div>
-                                    <span className="text-lg font-bold text-indigo-600">₹{plan.price}</span>
+                                    <span className="text-lg font-bold text-indigo-600">₹{plan.price}<span className="text-xs text-gray-500"> + GST</span></span>
                                 </div>
                                 <Button
                                     size="sm"

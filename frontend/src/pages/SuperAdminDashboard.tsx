@@ -623,7 +623,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
                                 <p className="text-sm text-gray-500 mt-1">{plan.description}</p>
                                 <div className="mt-4 flex items-baseline">
                                     <span className="text-3xl font-extrabold text-gray-900">₹{plan.price}</span>
-                                    <span className="ml-1 text-gray-500">/{plan.billingCycle.toLowerCase()}</span>
+                                    <span className="ml-1 text-gray-500">/{plan.billingCycle.toLowerCase()} <span className="text-xs">+ GST</span></span>
                                 </div>
                                 <div className="mt-6 space-y-2">
                                     {plan.features.map((feat, i) => (
@@ -721,7 +721,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
 
                             <div className="mt-6 flex justify-end gap-3">
                                 <Button variant="ghost" onClick={() => setIsEditorOpen(false)}>Cancel</Button>
-                                <Button variant="primary" onClick={handleSavePlan}>Save Plan</Button>
+                                <Button variant="primary" onClick={handleSavePlan} isLoading={isSaving}>Save Plan</Button>
                             </div>
                         </Card>
                     </div>
@@ -894,7 +894,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
                                             </div>
                                             <div className="mt-4 flex items-baseline">
                                                 <span className="text-3xl font-extrabold text-indigo-600">₹{plan.price}</span>
-                                                <span className="ml-1 text-gray-500">/ {plan.durationDays} days</span>
+                                                <span className="ml-1 text-gray-500">/ {plan.durationDays} days <span className="text-xs">+ GST</span></span>
                                             </div>
                                         </div>
                                         <div className="p-4 bg-gray-50 border-t">
@@ -1312,7 +1312,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                                <select className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5 bg-white border" value={newAd.category} onChange={e => setNewAd({ ...newAd, category: e.target.value as any })}>
+                                <select className="w-full border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2.5 bg-white border" value={newAd.categoryId || ''} onChange={e => setNewAd({ ...newAd, categoryId: e.target.value })}>
+                                    <option value="">Select Category</option>
                                     <option value="EDUCATION">Education</option>
                                     <option value="FOOD">Food</option>
                                     <option value="TRANSPORT">Transport</option>

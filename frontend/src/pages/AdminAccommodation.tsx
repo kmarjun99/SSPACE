@@ -216,6 +216,7 @@ export const AdminAccommodation: React.FC<AdminAccommodationProps> = ({ state, o
     };
 
     const [isSaving, setIsSaving] = useState(false);
+    const [customAmenity, setCustomAmenity] = useState('');
 
     const saveDraft = async (): Promise<string | null> => {
         const payload = {
@@ -519,6 +520,49 @@ export const AdminAccommodation: React.FC<AdminAccommodationProps> = ({ state, o
                                             setFormData({ ...formData, amenities: cur.includes(opt) ? cur.filter(x => x !== opt) : [...cur, opt] });
                                         }} /> <span className="text-xs">{opt}</span></label>
                                     ))}
+                                    {/* Display custom amenities */}
+                                    {formData.amenities?.filter(a => !AMENITY_OPTIONS.includes(a)).map(customAmenity => (
+                                        <label key={customAmenity} className="flex items-center space-x-2 bg-indigo-50 p-1 rounded">
+                                            <input type="checkbox" checked={true} onChange={() => {
+                                                const cur = formData.amenities || [];
+                                                setFormData({ ...formData, amenities: cur.filter(x => x !== customAmenity) });
+                                            }} />
+                                            <span className="text-xs font-medium text-indigo-700">{customAmenity}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {/* Add custom amenity input */}
+                                <div className="mt-3 flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Add your own amenity"
+                                        value={customAmenity}
+                                        onChange={(e) => setCustomAmenity(e.target.value)}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter' && customAmenity.trim()) {
+                                                const cur = formData.amenities || [];
+                                                if (!cur.includes(customAmenity.trim())) {
+                                                    setFormData({ ...formData, amenities: [...cur, customAmenity.trim()] });
+                                                    setCustomAmenity('');
+                                                }
+                                            }
+                                        }}
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                    />
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            if (customAmenity.trim()) {
+                                                const cur = formData.amenities || [];
+                                                if (!cur.includes(customAmenity.trim())) {
+                                                    setFormData({ ...formData, amenities: [...cur, customAmenity.trim()] });
+                                                    setCustomAmenity('');
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Add
+                                    </Button>
                                 </div>
                             </div>
 
@@ -706,7 +750,7 @@ export const AdminAccommodation: React.FC<AdminAccommodationProps> = ({ state, o
                                                 <p className="font-bold text-gray-900">{plan.name}</p>
                                                 <p className="text-sm text-gray-500">{plan.durationDays} days • {plan.placement.replace('_', ' ')}</p>
                                             </div>
-                                            <span className="text-lg font-bold text-indigo-600">₹{plan.price}</span>
+                                            <span className="text-lg font-bold text-indigo-600">₹{plan.price}<span className="text-xs text-gray-500"> + GST</span></span>
                                         </div>
                                     </div>
                                 ))}
@@ -720,7 +764,7 @@ export const AdminAccommodation: React.FC<AdminAccommodationProps> = ({ state, o
                                 onClick={handleBoostSubmit}
                                 disabled={isProcessingBoost || !selectedPlan}
                             >
-                                {isProcessingBoost ? 'Processing Payment...' : `Pay ₹${selectedPlan?.price || 0} & Submit Request`}
+                                {isProcessingBoost ? 'Processing Payment...' : `Pay ₹${selectedPlan?.price || 0} + GST & Submit Request`}
                             </Button>
                         )}
 

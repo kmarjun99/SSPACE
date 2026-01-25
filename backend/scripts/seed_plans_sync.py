@@ -16,8 +16,8 @@ def main():
         
         # Insert new plans
         plans = [
-            (str(uuid.uuid4()), 'Featured Listing - 7 Days', 'Get your property featured for 7 days', 499.0, 7, 'both', 'featured_section', 1, 'active', 'super_admin', datetime.utcnow().isoformat()),
-            (str(uuid.uuid4()), 'Premium Visibility - 30 Days', 'Maximum visibility for 30 days', 1499.0, 30, 'both', 'top_list', 5, 'active', 'super_admin', datetime.utcnow().isoformat()),
+            (str(uuid.uuid4()), 'Featured Listing - 7 Days', 'Get your property featured for 7 days (₹499 + GST)', 499.0, 7, 'both', 'featured_section', 1, 'active', 'super_admin', datetime.utcnow().isoformat()),
+            (str(uuid.uuid4()), 'Premium Visibility - 30 Days', 'Maximum visibility for 30 days (₹1499 + GST)', 1499.0, 30, 'both', 'top_list', 5, 'active', 'super_admin', datetime.utcnow().isoformat()),
         ]
         
         for plan in plans:

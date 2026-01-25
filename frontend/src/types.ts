@@ -82,6 +82,10 @@ export interface ReadingRoom {
   isFeatured?: boolean;
   featuredPlan?: 'DAILY' | 'WEEKLY' | 'MONTHLY';
   featuredExpiry?: string;
+  // Payment & Subscription tracking
+  subscriptionPlanId?: string;
+  paymentId?: string;
+  paymentDate?: string;
 }
 
 export interface Cabin {
@@ -159,6 +163,33 @@ export interface Notification {
   read: boolean;
   date: string;
   type: 'info' | 'success' | 'warning' | 'error';
+  messageId?: string; // Link to message if notification is about a message
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  receiverId: string;
+  receiverName: string;
+  receiverRole: UserRole;
+  content: string;
+  timestamp: string;
+  read: boolean;
+  venueId?: string; // Optional: link to specific venue
+  venueName?: string; // Optional: venue name for context
+}
+
+export interface Conversation {
+  id: string;
+  participantIds: string[];
+  participants: { id: string; name: string; role: UserRole; avatarUrl?: string }[];
+  lastMessage?: Message;
+  unreadCount: number;
+  venueId?: string; // Optional: associate with specific venue
+  venueName?: string;
 }
 
 export interface Review {
@@ -252,12 +283,11 @@ export interface SubscriptionPlan {
   name: string;
   description: string;
   price: number;
-  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
-  allowedListingTypes: ('READING_ROOM' | 'ACCOMMODATION')[];
+  durationDays: number;
   features: string[];
   isActive: boolean;
   isDefault: boolean;
-  ctaLabel: string;
+  createdBy: string;
   createdAt: string;
 }
 
@@ -344,6 +374,8 @@ export interface AppState {
   subscriptionPlans: SubscriptionPlan[];
   promotionPlans: PromotionPlan[];
   promotionRequests: PromotionRequest[];
+  messages: Message[];
+  conversations: Conversation[];
 }
 
 export interface PlatformSettings {

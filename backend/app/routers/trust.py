@@ -439,9 +439,18 @@ async def get_owner_flags(
             "entity_id": f.entity_id,
             "entity_name": f.entity_name,
             "flag_type": str(f.flag_type.value) if f.flag_type else None,
+            "custom_reason": f.custom_reason,
+            "raised_by": f.raised_by,
+            "raised_by_name": f.raised_by_name,
             "status": str(f.status.value) if f.status else None,
+            "resolution_notes": f.resolution_notes,
+            "resolved_by": f.resolved_by,
+            "resolved_by_name": f.resolved_by_name,
             "created_at": f.created_at.isoformat() if f.created_at else None,
-            "owner_notes": f.owner_notes
+            "updated_at": f.updated_at.isoformat() if f.updated_at else None,
+            "resolved_at": f.resolved_at.isoformat() if f.resolved_at else None,
+            "owner_notes": f.owner_notes,
+            "resubmitted_at": f.resubmitted_at.isoformat() if f.resubmitted_at else None
         }
         for f in flags
     ]

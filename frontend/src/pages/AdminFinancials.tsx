@@ -160,7 +160,62 @@ export const AdminFinancials: React.FC<AdminFinancialsProps> = ({ state }) => {
    }, [transactions]);
 
    const handleExport = () => {
-      alert("Downloading financial report as CSV...");
+      try {
+         // Prepare CSV data
+         const csvHeaders = [
+            'Date',
+            'Transaction ID',
+            'Student Name',
+            'Type',
+            'Cabin',
+            'Amount',
+            'Method',
+            'Description'
+         ];
+
+         const csvRows = filteredTransactions.map(t => [
+            t.date,
+            t.transaction_id || t.id,
+            t.user_name,
+            t.type,
+            t.cabin_number,
+            `₹${t.amount}`,
+            t.method || 'N/A',
+            t.description || ''
+         ]);
+
+         // Create CSV content
+         const csvContent = [
+            csvHeaders.join(','),
+            ...csvRows.map(row => row.map(cell => {
+               // Escape commas and quotes in cell content
+               const cellStr = String(cell || '');
+               if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                  return `"${cellStr.replace(/"/g, '""')}"`;
+               }
+               return cellStr;
+            }).join(','))
+         ].join('\n');
+
+         // Create blob and download
+         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+         const link = document.createElement('a');
+         const url = URL.createObjectURL(blob);
+         
+         const today = new Date().toISOString().split('T')[0];
+         const filename = `${myRoom?.name || 'venue'}_financial_report_${today}.csv`;
+         
+         link.setAttribute('href', url);
+         link.setAttribute('download', filename);
+         link.style.visibility = 'hidden';
+         document.body.appendChild(link);
+         link.click();
+         document.body.removeChild(link);
+         URL.revokeObjectURL(url);
+      } catch (error) {
+         console.error('Failed to export CSV:', error);
+         alert('Failed to export report. Please try again.');
+      }
    };
 
    if (!myRoom) {

@@ -18,7 +18,7 @@ async def seed_boost_plans():
             plans = [
                 BoostPlan(
                     name="Featured Listing - Basic",
-                    description="Get your property featured for 7 days",
+                    description="Get your property featured for 7 days (₹499 + GST)",
                     price=499.0,
                     duration_days=7,
                     applicable_to=BoostApplicableTo.BOTH,
@@ -29,7 +29,7 @@ async def seed_boost_plans():
                 ),
                 BoostPlan(
                     name="Premium Visibility - 30 Days",
-                    description="Maximum visibility for 30 days",
+                    description="Maximum visibility for 30 days (₹1499 + GST)",
                     price=1499.0,
                     duration_days=30,
                     applicable_to=BoostApplicableTo.BOTH,

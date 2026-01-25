@@ -48,6 +48,11 @@ class Accommodation(Base):
     # NEW: Reference to master locations table
     location_id = Column(String, ForeignKey("locations.id"), nullable=True, index=True)
     
+    # Payment & Subscription tracking
+    subscription_plan_id = Column(String, ForeignKey("subscription_plans.id"), nullable=True)
+    payment_id = Column(String, nullable=True)  # Razorpay payment ID
+    payment_date = Column(String, nullable=True)  # Using String for datetime to avoid migration issues
+    
     @property
     def image_url(self):
         # Fallback for frontend

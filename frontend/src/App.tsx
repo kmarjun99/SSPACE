@@ -28,7 +28,8 @@ import { SuperAdminProfile } from './pages/SuperAdminProfile';
 import { SuperAdminSettings } from './pages/SuperAdminSettings';
 import { SuperAdminAccommodationReview } from './pages/SuperAdminAccommodationReview';
 import { SupportPage } from './pages/Support';
-import { AppState, UserRole, User, Booking, CabinStatus, ReadingRoom, Cabin, Notification, Review, WaitlistEntry, Accommodation, SupportTicket, PlatformSettings, PromotionPlan, PromotionRequest } from './types';
+import { MessagesPage } from './pages/MessagesPage';
+import { AppState, UserRole, User, Booking, CabinStatus, ReadingRoom, Cabin, Notification, Review, WaitlistEntry, Accommodation, SupportTicket, PlatformSettings, PromotionPlan, PromotionRequest, Message, Conversation } from './types';
 import { MOCK_USERS, MOCK_BOOKINGS, generateCabins, MOCK_NOTIFICATIONS, MOCK_READING_ROOMS, MOCK_REVIEWS, MOCK_ACCOMMODATIONS, MOCK_TICKETS, MOCK_PLANS, MOCK_PROMOTION_PLANS, MOCK_PROMOTION_REQUESTS } from './services/mockData';
 import { realTimeService } from './services/realTimeService';
 import { bookingService } from './services/bookingService';
@@ -37,6 +38,7 @@ import { supplyService } from './services/supplyService';
 import { userService } from './services/userService';
 import { subscriptionService } from './services/subscriptionService';
 import { favoritesService } from './services/favoritesService';
+import { messagingService } from './services/messagingService';
 
 const App: React.FC = () => {
   // --- Global App State Simulation ---
@@ -65,6 +67,8 @@ const App: React.FC = () => {
       subscriptionPlans: [], // Start empty - will be fetched from API
       promotionPlans: MOCK_PROMOTION_PLANS,
       promotionRequests: MOCK_PROMOTION_REQUESTS,
+      messages: [],
+      conversations: [],
       settings: savedData.settings || {
         platformName: 'StudySpace',
         supportEmail: 'support@studyspace.com',
@@ -160,22 +164,10 @@ const App: React.FC = () => {
         // Fetch subscription plans from backend
         try {
           const subscriptionPlans = await subscriptionService.getPlans();
+          console.log('✅ Loaded subscription plans:', subscriptionPlans.length, subscriptionPlans);
           setAppState(prev => ({
             ...prev,
-            subscriptionPlans: subscriptionPlans.map(p => ({
-              id: p.id,
-              name: p.name,
-              description: p.description || '',
-              price: p.price,
-              durationDays: p.durationDays,
-              billingCycle: 'MONTHLY' as const,
-              allowedListingTypes: ['READING_ROOM' as const, 'ACCOMMODATION' as const],
-              features: p.features || [],
-              isActive: p.isActive,
-              isDefault: p.isDefault,
-              ctaLabel: 'Subscribe',
-              createdAt: p.createdAt || new Date().toISOString()
-            }))
+            subscriptionPlans: subscriptionPlans
           }));
         } catch (e) {
           console.warn('Failed to fetch subscription plans:', e);
@@ -191,6 +183,15 @@ const App: React.FC = () => {
             console.log('✅ Loaded favorites:', myFavorites.length);
           } catch (e) {
             console.warn('Failed to fetch favorites:', e);
+          }
+
+          // Fetch user's conversations and messages
+          let myConversations: Conversation[] = [];
+          try {
+            myConversations = await messagingService.getConversations();
+            console.log('✅ Loaded conversations:', myConversations.length);
+          } catch (e) {
+            console.warn('Failed to fetch conversations:', e);
           }
 
           let myStudents: User[] = [];
@@ -237,7 +238,8 @@ const App: React.FC = () => {
               ...prev,
               bookings: enrichedBookings,
               users: finalUsers,
-              favorites: myFavorites
+              favorites: myFavorites,
+              conversations: myConversations
             };
           });
         }
@@ -885,6 +887,12 @@ const App: React.FC = () => {
               } />
               <Route path="/student/payments" element={<StudentPayments state={appState} user={appState.currentUser} />} />
               <Route path="/student/favorites" element={<FavoritesPage onFavoritesChange={handleSyncFavorites} />} />
+              <Route path="/student/messages" element={
+                <MessagesPage
+                  currentUserId={appState.currentUser.id}
+                  currentUserRole={appState.currentUser.role}
+                />
+              } />
               <Route path="/student/profile" element={
                 <StudentProfile
                   user={appState.currentUser}
@@ -979,6 +987,12 @@ const App: React.FC = () => {
               <Route path="/admin/billing" element={<OwnerBilling state={appState} user={appState.currentUser} />} />
               <Route path="/admin/settings" element={<OwnerSettings user={appState.currentUser} />} />
               <Route path="/admin/compliance" element={<OwnerCompliance state={appState} user={appState.currentUser} onUpdateUser={handleUpdateUser} />} />
+              <Route path="/admin/messages" element={
+                <MessagesPage
+                  currentUserId={appState.currentUser.id}
+                  currentUserRole={appState.currentUser.role}
+                />
+              } />
               {/* Preview route - allows ADMIN to view their venue as students see it */}
               <Route path="/admin/preview/venue/:roomId" element={
                 <ReadingRoomDetail
@@ -997,6 +1011,7 @@ const App: React.FC = () => {
               <Route path="/super-admin/profile" element={
                 <SuperAdminProfile
                   user={appState.currentUser}
+                  onUpdateUser={handleUpdateUser}
                   onLogout={handleLogout}
                 />
               } />
