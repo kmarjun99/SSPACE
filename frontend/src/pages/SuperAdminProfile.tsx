@@ -97,30 +97,9 @@ export const SuperAdminProfile: React.FC<SuperAdminProfileProps> = ({ user, onUp
             setIsLoading(false);
             setIsEditProfileOpen(false);
         }, 800);
-    };text-sm space-y-1 mb-2">
-                            <div className="flex items-center gap-2">
-                                <Mail className="w-4 h-4" />
-                                {user.email}
-                            </div>
-                            {user.phone && (
-                                <div className="flex items-center gap-2">
-                                    <Phone className="w-4 h-4" />
-                                    {user.phone}
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Badge variant="warning">Super Admin</Badge>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setIsEditProfileOpen(true)}
-                                className="text-indigo-600 hover:bg-indigo-50"
-                            >
-                                <Edit2 className="w-4 h-4 mr-1" />
-                                Edit Profile
-                            </Button>
-                        </div
+    };
+
+    const handleOpenModal = () => {
         setSelectedScopes([]);
         setClearAll(false);
         setClearSuccess(false);
