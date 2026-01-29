@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database import get_db
 from app.models.user import User, UserRole
-from app.schemas.user import UserResponse
+from app.schemas.user import UserResponse, AdminUserUpdate
 from app.deps import get_current_super_admin, get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -40,5 +40,29 @@ async def get_user_by_id(
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    return user
+
+@router.put("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: str,
+    updates: AdminUserUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_super_admin)
+):
+    """Update user details. Super Admin only."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalars().first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update fields that are provided
+    update_data = updates.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+    
+    await db.commit()
+    await db.refresh(user)
     
     return user

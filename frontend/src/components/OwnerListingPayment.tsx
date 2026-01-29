@@ -72,7 +72,7 @@ export const OwnerListingPayment: React.FC<OwnerListingPaymentProps> = ({
   };
 
   const getAuthToken = (): string => {
-    return localStorage.getItem('token') || '';
+    return localStorage.getItem('studySpace_token') || '';
   };
 
   const calculateGST = (amount: number): number => {
@@ -93,28 +93,15 @@ export const OwnerListingPayment: React.FC<OwnerListingPaymentProps> = ({
     setPaymentStep('processing');
 
     try {
-      // Load Razorpay script
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        toast.error('Failed to load payment gateway. Please check your internet connection.');
-        setLoading(false);
-        setPaymentStep('plan-selection');
-        return;
-      }
-
-      // Calculate total with GST
-      const baseAmount = selectedPlan.price;
-      const gstAmount = calculateGST(baseAmount);
-      const totalAmount = calculateTotal(baseAmount);
-
-      // Create order
-      const orderResponse = await axios.post(
-        `${API_BASE_URL}/payments/venue/create-order`,
+      // TEMPORARY: Skip payment gateway for development
+      // Directly mark as paid and submit
+      await axios.post(
+        `${API_BASE_URL}/payments/venue/dev-bypass`,
         {
           venue_id: venueId,
           venue_type: venueType,
           subscription_plan_id: selectedPlanId,
-          amount: totalAmount
+          amount: calculateTotal(selectedPlan.price)
         },
         {
           headers: {
@@ -124,83 +111,19 @@ export const OwnerListingPayment: React.FC<OwnerListingPaymentProps> = ({
         }
       );
 
-      const { order_id, amount: orderAmount, currency, razorpay_key_id } = orderResponse.data;
+      setPaymentStep('success');
+      toast.success('Venue submitted successfully!');
+      
+      setTimeout(() => {
+        onSuccess();
+      }, 2000);
 
-      // Get user info
-      const userName = localStorage.getItem('user_name') || 'Venue Owner';
-      const userEmail = localStorage.getItem('user_email') || '';
-
-      // Razorpay options
-      const options = {
-        key: razorpay_key_id,
-        amount: orderAmount,
-        currency: currency,
-        name: 'SSPACE',
-        description: `${selectedPlan.name} - ${venueName}`,
-        image: '/logo.png',
-        order_id: order_id,
-        handler: async (response: any) => {
-          try {
-            // Verify payment
-            await axios.post(
-              `${API_BASE_URL}/payments/venue/verify`,
-              {
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                venue_id: venueId,
-                venue_type: venueType,
-                subscription_plan_id: selectedPlanId
-              },
-              {
-                headers: {
-                  'Authorization': `Bearer ${getAuthToken()}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-
-            toast.success('Payment successful! Your listing is now under review. 🎉');
-            setPaymentStep('success');
-            setTimeout(() => {
-              onSuccess();
-            }, 2000);
-          } catch (error: any) {
-            console.error('Payment verification error:', error);
-            toast.error('Payment verification failed. Please contact support.');
-            setLoading(false);
-            setPaymentStep('plan-selection');
-          }
-        },
-        prefill: {
-          name: userName,
-          email: userEmail
-        },
-        notes: {
-          venue_id: venueId,
-          venue_type: venueType,
-          subscription_plan_id: selectedPlanId
-        },
-        theme: {
-          color: '#4F46E5'
-        },
-        modal: {
-          ondismiss: () => {
-            setLoading(false);
-            setPaymentStep('plan-selection');
-            toast.error('Payment cancelled');
-          }
-        }
-      };
-
-      const razorpayInstance = new window.Razorpay(options);
-      razorpayInstance.open();
     } catch (error: any) {
       console.error('Payment error:', error);
-      const errorMessage = error.response?.data?.detail || 'Failed to initiate payment';
-      toast.error(errorMessage);
-      setLoading(false);
+      toast.error(error.response?.data?.detail || 'Failed to submit venue. Please try again.');
       setPaymentStep('plan-selection');
+    } finally {
+      setLoading(false);
     }
   };
 

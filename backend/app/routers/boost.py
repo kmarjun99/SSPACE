@@ -145,10 +145,10 @@ async def create_boost_plan(
         description=plan.description,
         price=plan.price,
         duration_days=plan.duration_days,
-        applicable_to=BoostApplicableTo(plan.applicable_to),
-        placement=BoostPlacement(plan.placement),
+        applicable_to=plan.applicable_to,
+        placement=plan.placement,
         visibility_weight=plan.visibility_weight,
-        status=BoostPlanStatus.DRAFT,
+        status="draft",
         created_by=current_user.id
     )
     
@@ -162,10 +162,10 @@ async def create_boost_plan(
         description=new_plan.description,
         price=new_plan.price,
         duration_days=new_plan.duration_days,
-        applicable_to=new_plan.applicable_to.value,
-        placement=new_plan.placement.value,
+        applicable_to=new_plan.applicable_to,
+        placement=new_plan.placement,
         visibility_weight=new_plan.visibility_weight,
-        status=new_plan.status.value,
+        status=new_plan.status,
         created_by=new_plan.created_by,
         created_at=new_plan.created_at
     )
@@ -189,14 +189,7 @@ async def update_boost_plan(
     
     update_data = updates.model_dump(exclude_unset=True)
     for key, value in update_data.items():
-        if key == "applicable_to" and value:
-            setattr(plan, key, BoostApplicableTo(value))
-        elif key == "placement" and value:
-            setattr(plan, key, BoostPlacement(value))
-        elif key == "status" and value:
-            setattr(plan, key, BoostPlanStatus(value))
-        else:
-            setattr(plan, key, value)
+        setattr(plan, key, value)
     
     await db.commit()
     await db.refresh(plan)
@@ -207,10 +200,10 @@ async def update_boost_plan(
         description=plan.description,
         price=plan.price,
         duration_days=plan.duration_days,
-        applicable_to=plan.applicable_to.value,
-        placement=plan.placement.value,
+        applicable_to=plan.applicable_to,
+        placement=plan.placement,
         visibility_weight=plan.visibility_weight,
-        status=plan.status.value,
+        status=plan.status,
         created_by=plan.created_by,
         created_at=plan.created_at
     )

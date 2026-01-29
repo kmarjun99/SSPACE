@@ -146,13 +146,15 @@ async def get_localities(
     city: str = Query(..., description="City"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get localities for a given state and city."""
+    """Get localities for a given state and city. Only returns locations with specific localities."""
     query = (
         select(Location)
         .where(
             Location.is_active == True,
             func.lower(Location.state) == state.lower().strip(),
-            Location.city_normalized == city.lower().strip()
+            Location.city_normalized == city.lower().strip(),
+            Location.locality.isnot(None),
+            Location.locality != ''
         )
         .order_by(Location.locality)
     )

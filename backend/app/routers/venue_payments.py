@@ -225,6 +225,92 @@ async def verify_venue_payment(
     }
 
 
+@router.post("/dev-bypass")
+async def dev_bypass_payment(
+    request: CreateVenueOrderRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    DEVELOPMENT ONLY: Bypass payment gateway and mark venue as paid
+    """
+    # Verify subscription plan
+    plan_result = await db.execute(
+        select(SubscriptionPlan).where(SubscriptionPlan.id == request.subscription_plan_id)
+    )
+    plan = plan_result.scalar_one_or_none()
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Subscription plan not found")
+    
+    # Get venue and update status
+    venue = None
+    if request.venue_type == 'reading_room':
+        venue_result = await db.execute(
+            select(ReadingRoom).where(
+                ReadingRoom.id == request.venue_id,
+                ReadingRoom.owner_id == current_user.id
+            )
+        )
+        venue = venue_result.scalar_one_or_none()
+    elif request.venue_type == 'accommodation':
+        venue_result = await db.execute(
+            select(Accommodation).where(
+                Accommodation.id == request.venue_id,
+                Accommodation.owner_id == current_user.id
+            )
+        )
+        venue = venue_result.scalar_one_or_none()
+    
+    if not venue:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    
+    # Validate venue data
+    errors = []
+    if not venue.name: errors.append("Name")
+    if not venue.address: errors.append("Address")
+    if not venue.city: errors.append("City")
+    if not venue.contact_phone: errors.append("Phone")
+    
+    # Image validation
+    import json
+    valid_images = False
+    if venue.images:
+        try:
+            imgs = json.loads(venue.images)
+            if isinstance(imgs, list) and len(imgs) >= 4:
+                valid_images = True
+        except:
+            pass
+    
+    if not valid_images:
+        errors.append("Minimum 4 Images")
+    
+    if errors:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot complete submission. Incomplete venue details: {', '.join(errors)}"
+        )
+    
+    # Update venue status to VERIFICATION_PENDING
+    venue.status = ListingStatus.VERIFICATION_PENDING
+    venue.subscription_plan_id = request.subscription_plan_id
+    venue.payment_id = f"dev_bypass_{datetime.utcnow().timestamp()}"
+    venue.payment_date = datetime.utcnow()
+    
+    await db.commit()
+    
+    return {
+        "message": "Venue submitted successfully (dev mode). Awaiting admin approval.",
+        "venue_id": request.venue_id,
+        "status": venue.status,
+        "subscription_plan": {
+            "name": plan.name,
+            "duration_days": plan.duration_days
+        }
+    }
+
+
 @router.get("/status/{venue_id}")
 async def get_venue_payment_status(
     venue_id: str,

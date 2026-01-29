@@ -24,7 +24,7 @@ from app.models.payment_transaction import PaymentTransaction, PaymentMethod, Pa
 from app.models.reading_room import ReadingRoom, Cabin
 from app.models.accommodation import Accommodation
 
-router = APIRouter(tags=["Payments & Refunds"])
+router = APIRouter(prefix="/payments", tags=["Payments & Refunds"])
 
 
 # ============================================

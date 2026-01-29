@@ -111,8 +111,8 @@ export const boostService = {
             description: plan.description,
             price: plan.price,
             duration_days: plan.durationDays,
-            applicable_to: plan.applicableTo,
-            placement: plan.placement,
+            applicable_to: plan.applicableTo?.toLowerCase(),
+            placement: plan.placement?.toLowerCase(),
             visibility_weight: plan.visibilityWeight
         };
         const response = await api.post('/boost/plans', payload);
@@ -128,10 +128,10 @@ export const boostService = {
         if (updates.description !== undefined) payload.description = updates.description;
         if (updates.price !== undefined) payload.price = updates.price;
         if (updates.durationDays !== undefined) payload.duration_days = updates.durationDays;
-        if (updates.applicableTo !== undefined) payload.applicable_to = updates.applicableTo;
-        if (updates.placement !== undefined) payload.placement = updates.placement;
+        if (updates.applicableTo !== undefined) payload.applicable_to = updates.applicableTo.toLowerCase();
+        if (updates.placement !== undefined) payload.placement = updates.placement.toLowerCase();
         if (updates.visibilityWeight !== undefined) payload.visibility_weight = updates.visibilityWeight;
-        if (updates.status !== undefined) payload.status = updates.status;
+        if (updates.status !== undefined) payload.status = updates.status.toLowerCase();
 
         const response = await api.put(`/boost/plans/${planId}`, payload);
         return transformPlan(response.data);

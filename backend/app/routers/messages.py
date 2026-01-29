@@ -115,16 +115,20 @@ async def send_message(
     await db.commit()
     await db.refresh(message)
     
-    # Create notification for receiver
-    from app.routers.notifications import create_notification
-    await create_notification(
-        db=db,
-        user_id=message_data.receiver_id,
-        title=f"New message from {current_user.name}",
-        message=message_data.content[:100] + "..." if len(message_data.content) > 100 else message_data.content,
-        notification_type="info",
-        message_id=message.id
-    )
+    # Create notification for receiver (optional - don't fail if notification fails)
+    try:
+        from app.routers.notifications import create_notification
+        await create_notification(
+            db=db,
+            user_id=message_data.receiver_id,
+            title=f"New message from {current_user.name}",
+            message=message_data.content[:100] + "..." if len(message_data.content) > 100 else message_data.content,
+            notification_type="info",
+            message_id=message.id
+        )
+    except Exception as e:
+        print(f"Failed to create notification: {e}")
+        # Continue anyway - notification is not critical
     
     return MessageResponse(
         id=message.id,

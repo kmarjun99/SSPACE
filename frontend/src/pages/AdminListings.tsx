@@ -71,9 +71,10 @@ export const AdminListings: React.FC = () => {
                 await supplyService.deleteAccommodation(id);
                 setAccommodations(prev => prev.filter(a => a.id !== id));
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to delete:', error);
-            alert('Failed to delete. Please try again.');
+            const errorMessage = error.response?.data?.detail || 'Failed to delete. Please try again.';
+            alert(errorMessage);
         }
     };
 

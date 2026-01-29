@@ -20,6 +20,15 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = None
     password: Optional[str] = None
 
+class AdminUserUpdate(BaseModel):
+    """Schema for admin to update any user field including role and verification status"""
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[UserRole] = None
+    avatar_url: Optional[str] = None
+    phone: Optional[str] = None
+    verification_status: Optional[VerificationStatus] = None
+
 class UserResponse(UserBase):
     id: str
 

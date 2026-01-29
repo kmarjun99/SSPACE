@@ -21,6 +21,7 @@ import { bookingService } from '../services/bookingService';
 import { boostService, BoostPlan, BoostRequest } from '../services/boostService';
 import { subscriptionService } from '../services/subscriptionService';
 import { paymentService, RefundAdmin } from '../services/paymentService';
+import { userService } from '../services/userService';
 import { SuperAdminReadingRoomReview } from './SuperAdminReadingRoomReview';
 import { SuperAdminAccommodationReview } from './SuperAdminAccommodationReview';
 import { SuperAdminAdsView } from './SuperAdminAdsView';
@@ -784,7 +785,6 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
                 }
                 setIsEditorOpen(false);
                 setEditingPlan({ name: '', description: '', durationDays: 7, price: 499, status: 'draft', applicableTo: 'both', placement: 'featured_section' });
-                alert('Promotion Plan saved to database!');
             } catch (error) {
                 console.error('Failed to save plan:', error);
                 alert('Failed to save plan. Please try again.');
@@ -1368,17 +1368,54 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
         );
     };
 
-    const UsersView = () => (
-        <div className="space-y-6 animate-in fade-in">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900">User Directory</h2>
-                    <p className="text-gray-500">Manage all students and partners.</p>
+    const UsersView = () => {
+        const [editingUser, setEditingUser] = useState<any>(null);
+        const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+        const [localUsers, setLocalUsers] = useState<User[]>(state.users);
+
+        // Update local users when state.users changes
+        useEffect(() => {
+            setLocalUsers(state.users);
+        }, [state.users]);
+
+        const handleEditUser = (user: any) => {
+            setEditingUser({ ...user });
+            setIsUserModalOpen(true);
+        };
+
+        const handleSaveUser = async () => {
+            if (!editingUser) return;
+            
+            try {
+                const updated = await userService.updateUser(editingUser.id, {
+                    name: editingUser.name,
+                    email: editingUser.email,
+                    role: editingUser.role,
+                    verificationStatus: editingUser.verificationStatus
+                });
+                
+                // Update local users list
+                setLocalUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+                
+                setIsUserModalOpen(false);
+                setEditingUser(null);
+            } catch (error) {
+                console.error('Failed to save user:', error);
+                alert('Failed to update user. Please try again.');
+            }
+        };
+
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900">User Directory</h2>
+                        <p className="text-gray-500">Manage all students and partners.</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Input placeholder="Search users..." className="min-w-[300px]" />
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <Input placeholder="Search users..." className="min-w-[300px]" />
-                </div>
-            </div>
 
             <Card className="p-0 overflow-hidden border border-gray-200 shadow-sm">
                 <table className="w-full text-left text-sm text-gray-500">
@@ -1392,7 +1429,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {state.users.map(user => (
+                        {localUsers.map(user => (
                             <tr key={user.id} className="bg-white hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center">
@@ -1419,15 +1456,60 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
                                     Oct 24, 2023
                                 </td>
                                 <td className="px-6 py-4">
-                                    <Button size="sm" variant="ghost" className="text-indigo-600 hover:text-indigo-900">Edit</Button>
+                                    <Button size="sm" variant="ghost" className="text-indigo-600 hover:text-indigo-900" onClick={() => handleEditUser(user)}>Edit</Button>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </Card>
+
+            <Modal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} title="Edit User">
+                <div className="space-y-4">
+                    <Input
+                        label="Name"
+                        value={editingUser?.name || ''}
+                        onChange={e => setEditingUser({ ...editingUser, name: e.target.value })}
+                    />
+                    <Input
+                        label="Email"
+                        type="email"
+                        value={editingUser?.email || ''}
+                        onChange={e => setEditingUser({ ...editingUser, email: e.target.value })}
+                    />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                        <select
+                            className="w-full border p-2 rounded-lg"
+                            value={editingUser?.role || 'STUDENT'}
+                            onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
+                        >
+                            <option value="STUDENT">Student</option>
+                            <option value="ADMIN">Admin</option>
+                            <option value="SUPER_ADMIN">Super Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select
+                            className="w-full border p-2 rounded-lg"
+                            value={editingUser?.status || 'active'}
+                            onChange={e => setEditingUser({ ...editingUser, status: e.target.value })}
+                        >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="suspended">Suspended</option>
+                        </select>
+                    </div>
+                    <div className="flex justify-end gap-3 mt-6">
+                        <Button variant="ghost" onClick={() => setIsUserModalOpen(false)}>Cancel</Button>
+                        <Button variant="primary" onClick={handleSaveUser}>Save Changes</Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
-    );
+        );
+    };
 
     const CitiesView = () => {
         const [cities, setCities] = useState<CityStats[]>([]);
@@ -2043,6 +2125,54 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
             }
         };
 
+        const handleExportReport = () => {
+            // Prepare CSV data based on active tab
+            let csvContent = '';
+            let filename = '';
+
+            if (activeTab === 'overview') {
+                // Export financial overview
+                filename = `financial_report_${new Date().toISOString().split('T')[0]}.csv`;
+                csvContent = 'Date,Booking ID,User,Amount,Status\n';
+                
+                bookings.forEach(booking => {
+                    const date = booking.startDate || 'N/A';
+                    const id = booking.id || 'N/A';
+                    const user = booking.userId || 'N/A';
+                    const amount = booking.amount || 0;
+                    const status = booking.status || 'N/A';
+                    csvContent += `${date},${id},${user},${amount},${status}\n`;
+                });
+            } else {
+                // Export refunds
+                filename = `refunds_report_${new Date().toISOString().split('T')[0]}.csv`;
+                csvContent = 'Refund ID,Booking ID,User,Amount,Status,Reason,Requested Date,Processed Date\n';
+                
+                refunds.forEach(refund => {
+                    const id = refund.id || 'N/A';
+                    const bookingId = refund.bookingId || 'N/A';
+                    const userId = refund.userId || 'N/A';
+                    const amount = refund.amount || 0;
+                    const status = refund.status || 'N/A';
+                    const reason = (refund.reason || 'N/A').replace(/,/g, ';'); // Replace commas to avoid CSV issues
+                    const requestedDate = refund.requestedAt || 'N/A';
+                    const processedDate = refund.processedAt || 'N/A';
+                    csvContent += `${id},${bookingId},${userId},${amount},${status},"${reason}",${requestedDate},${processedDate}\n`;
+                });
+            }
+
+            // Create blob and download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
         // --- Metrics Calculation ---
         const totalVolume = bookings.reduce((sum, b) => sum + (b.amount || 0), 0);
         const platformRevenue = totalVolume * 0.10;
@@ -2081,7 +2211,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ state 
                         <h2 className="text-2xl font-bold text-gray-900">Finance & Refunds</h2>
                         <p className="text-gray-500">Revenue capture, payouts, and refund management.</p>
                     </div>
-                    <Button variant="outline"><ExternalLink className="w-4 h-4 mr-2" /> Export Report</Button>
+                    <Button variant="outline" onClick={handleExportReport}><ExternalLink className="w-4 h-4 mr-2" /> Export Report</Button>
                 </div>
 
                 {/* Tabs */}

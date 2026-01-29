@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
@@ -39,6 +39,12 @@ import { userService } from './services/userService';
 import { subscriptionService } from './services/subscriptionService';
 import { favoritesService } from './services/favoritesService';
 import { messagingService } from './services/messagingService';
+
+// Wrapper to force remount when venueId changes
+const AdminVenueWrapper: React.FC<any> = (props) => {
+  const { venueId } = useParams<{ venueId: string }>();
+  return <AdminVenue key={venueId} {...props} />;
+};
 
 const App: React.FC = () => {
   // --- Global App State Simulation ---
@@ -383,8 +389,8 @@ const App: React.FC = () => {
     localStorage.setItem('studySpace_user', JSON.stringify(updatedUser));
   };
 
-  const handleCreateReadingRoom = async (roomData: Partial<ReadingRoom>) => {
-    if (!appState.currentUser) return;
+  const handleCreateReadingRoom = async (roomData: Partial<ReadingRoom>): Promise<ReadingRoom> => {
+    if (!appState.currentUser) throw new Error("User not logged in");
 
 
     try {
@@ -395,6 +401,8 @@ const App: React.FC = () => {
         ...prev,
         readingRooms: [...prev.readingRooms, newRoom]
       }));
+      
+      return newRoom;
     } catch (err: any) {
       console.error("Failed to create reading room:", err);
       // Show specific error from backend validation if available
@@ -912,20 +920,8 @@ const App: React.FC = () => {
             <>
               <Route path="/admin" element={<AdminDashboard state={appState} />} />
               <Route path="/admin/listings" element={<AdminListings />} />
-              <Route path="/admin/venue/new" element={
-                <AdminVenue
-                  state={appState}
-                  onCreateRoom={handleCreateReadingRoom}
-                  onUpdateRoom={handleUpdateReadingRoom}
-                  onAddCabin={handleAddCabin}
-                  onBulkAddCabins={handleBulkAddCabins}
-                  onUpdateCabin={handleUpdateCabin}
-                  onBulkUpdateCabins={handleBulkUpdateCabins}
-                  onBulkDeleteCabins={handleBulkDeleteCabins}
-                />
-              } />
               <Route path="/admin/venue/:venueId" element={
-                <AdminVenue
+                <AdminVenueWrapper
                   state={appState}
                   onCreateRoom={handleCreateReadingRoom}
                   onUpdateRoom={handleUpdateReadingRoom}
@@ -934,39 +930,9 @@ const App: React.FC = () => {
                   onUpdateCabin={handleUpdateCabin}
                   onBulkUpdateCabins={handleBulkUpdateCabins}
                   onBulkDeleteCabins={handleBulkDeleteCabins}
-                />
-              } />
-              {/* Keep old route for backward compatibility */}
-              <Route path="/admin/venue" element={
-                <AdminVenue
-                  state={appState}
-                  onCreateRoom={handleCreateReadingRoom}
-                  onUpdateRoom={handleUpdateReadingRoom}
-                  onAddCabin={handleAddCabin}
-                  onBulkAddCabins={handleBulkAddCabins}
-                  onUpdateCabin={handleUpdateCabin}
-                  onBulkUpdateCabins={handleBulkUpdateCabins}
-                  onBulkDeleteCabins={handleBulkDeleteCabins}
-                />
-              } />
-              <Route path="/admin/accommodation/new" element={
-                <AdminAccommodation
-                  state={appState}
-                  onCreateAccommodation={handleCreateAccommodation}
-                  onUpdateAccommodation={handleUpdateAccommodation}
-                  onDeleteAccommodation={handleDeleteAccommodation}
                 />
               } />
               <Route path="/admin/accommodation/:accommodationId" element={
-                <AdminAccommodation
-                  state={appState}
-                  onCreateAccommodation={handleCreateAccommodation}
-                  onUpdateAccommodation={handleUpdateAccommodation}
-                  onDeleteAccommodation={handleDeleteAccommodation}
-                />
-              } />
-              {/* Keep old route for backward compatibility */}
-              <Route path="/admin/accommodation" element={
                 <AdminAccommodation
                   state={appState}
                   onCreateAccommodation={handleCreateAccommodation}

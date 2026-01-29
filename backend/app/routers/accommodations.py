@@ -6,6 +6,7 @@ from sqlalchemy.future import select
 from app.database import get_db
 from app.models.accommodation import Accommodation, AccommodationType, Gender
 from app.models.reading_room import ListingStatus
+from app.models.booking import Booking
 from app.schemas.accommodation import AccommodationResponse, AccommodationCreate, AccommodationUpdate
 from app.models.user import User, UserRole
 from app.deps import get_current_admin, get_current_user_optional, get_current_user
@@ -155,7 +156,7 @@ async def delete_accommodation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin)
 ):
-    """Delete an accommodation. Only owner can delete."""
+    """Delete an accommodation. Only owner can delete. Cannot delete if there are any bookings."""
     result = await db.execute(select(Accommodation).where(Accommodation.id == acc_id))
     acc = result.scalars().first()
     if not acc:
@@ -163,6 +164,17 @@ async def delete_accommodation(
     
     if acc.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this accommodation")
+    
+    # Check for any bookings on this accommodation
+    bookings_check = await db.execute(
+        select(Booking).where(Booking.accommodation_id == acc_id)
+    )
+    existing_bookings = bookings_check.scalars().first()
+    if existing_bookings:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot delete accommodation with existing bookings. Please contact support if you need to remove this listing."
+        )
     
     await db.delete(acc)
     await db.commit()

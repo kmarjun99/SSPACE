@@ -36,5 +36,30 @@ export const userService = {
             console.error('Failed to fetch user:', e);
             return null;
         }
+    },
+
+    /**
+     * Update user details (Super Admin only)
+     */
+    updateUser: async (userId: string, updates: Partial<User>): Promise<User> => {
+        const payload: any = {};
+        if (updates.name !== undefined) payload.name = updates.name;
+        if (updates.email !== undefined) payload.email = updates.email;
+        if (updates.role !== undefined) payload.role = updates.role;
+        if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl;
+        if (updates.phone !== undefined) payload.phone = updates.phone;
+        if (updates.verificationStatus !== undefined) payload.verification_status = updates.verificationStatus;
+
+        const response = await api.put(`/users/${userId}`, payload);
+        const u = response.data;
+        return {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            avatarUrl: u.avatar_url,
+            phone: u.phone,
+            verificationStatus: u.verification_status
+        } as User;
     }
 };

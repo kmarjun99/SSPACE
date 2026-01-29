@@ -1,5 +1,5 @@
 ﻿
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -14,7 +14,7 @@ import { OwnerListingPayment } from '../components/OwnerListingPayment';
 
 interface AdminVenueProps {
     state: AppState;
-    onCreateRoom: (data: Partial<ReadingRoom>) => void;
+    onCreateRoom: (data: Partial<ReadingRoom>) => Promise<ReadingRoom>;
     onUpdateRoom: (data: Partial<ReadingRoom>) => void;
     onAddCabin: (data: Partial<Cabin>) => void;
     onBulkAddCabins: (data: Partial<Cabin>[]) => void;
@@ -29,41 +29,67 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
     const { venueId } = useParams<{ venueId?: string }>();
     const navigate = useNavigate();
 
-    // Determine the mode based on URL:
-    // - /admin/venue/new => isNewMode = true, create new venue
-    // - /admin/venue/:id => edit specific venue by ID
-    // - /admin/venue (no param) => backward compatible, find first owned venue
+    // Determine the mode based on URL
     const isNewMode = venueId === 'new';
+    console.log('🔍 venueId:', venueId, '| isNewMode:', isNewMode);
 
-    // Find venue based on URL
-    const venue = venueId && venueId !== 'new'
-        ? state.readingRooms.find(r => r.id === venueId)  // Specific venue by ID
-        : venueId === undefined
-            ? state.readingRooms.find(r => r.ownerId === state.currentUser?.id)  // Backward compat: first owned
-            : undefined;  // 'new' mode - no venue yet
+    // Find venue - MUST be undefined in new mode
+    const venue = useMemo(() => {
+        if (venueId === 'new') {
+            console.log('✅ NEW MODE - venue will be undefined');
+            return undefined;
+        }
+        if (venueId && venueId !== 'new') {
+            const found = state.readingRooms.find(r => r.id === venueId);
+            console.log('🔍 Looking for venue ID:', venueId, '| Found:', found?.name || 'NOT FOUND');
+            return found;
+        }
+        // Backward compat: find first owned
+        const owned = state.readingRooms.find(r => r.ownerId === state.currentUser?.id);
+        console.log('🔍 No venueId param, using first owned:', owned?.name || 'NONE');
+        return owned;
+    }, [venueId, state.readingRooms, state.currentUser?.id]);
+
+    console.log('📊 Final venue:', venue?.name || 'undefined', '| isNewMode:', isNewMode);
 
     const myCabins = venue ? state.cabins.filter(c => c.readingRoomId === venue.id) : [];
 
-    // --- Onboarding / Wizard State ---
+    // --- Form State ---
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
-
-    // --- Form State ---
     const [venueFormData, setVenueFormData] = useState<Partial<ReadingRoom>>({});
+    const [images, setImages] = useState<string[]>([]);
+    const [cabinFormData, setCabinFormData] = useState<Partial<Cabin>>({
+        number: '', floor: 1, price: 0, status: CabinStatus.AVAILABLE, amenities: ['WiFi', 'AC']
+    });
+    const [batchConfig, setBatchConfig] = useState({
+        floor: 1, startNum: 1, endNum: 20, price: 0, amenities: ['WiFi', 'AC'] as string[], prefix: '', zone: 'MIDDLE' as 'FRONT' | 'MIDDLE' | 'BACK'
+    });
 
+    // Display data - in new mode use venueFormData (which gets updated by user input)
+    const displayFormData = isNewMode ? venueFormData : (venue || venueFormData);
+    const displayImages = isNewMode ? images : (images.length > 0 ? images : (venue?.images ? JSON.parse(venue.images) : []));
 
-    // Initialize & Sync Price
-    useEffect(() => {
-        if (venue) {
+    // Initialize form data
+    useLayoutEffect(() => {
+        console.log('⚡ useLayoutEffect running | isNewMode:', isNewMode, '| venue:', venue?.name);
+        if (isNewMode) {
+            console.log('🔄 NEW MODE - Clearing form');
+            setVenueFormData({});
+            setImages([]);
+            setStep(1);
+        } else if (venue) {
+            console.log('📝 EDIT MODE:', venue.name);
             setVenueFormData(venue);
+            setImages(venue.images ? JSON.parse(venue.images) : []);
             if (venue.priceStart) {
                 setBatchConfig(prev => ({ ...prev, price: venue.priceStart! }));
                 setCabinFormData(prev => ({ ...prev, price: venue.priceStart! }));
             }
         }
-    }, [venue]);
+    }, [isNewMode, venue?.id]);
 
-    // Determine current phase based on status
+    // Determine current phase
     const currentStatus = venue?.status || ListingStatus.DRAFT;
     const isLive = currentStatus === ListingStatus.LIVE;
     const isPending = currentStatus === ListingStatus.VERIFICATION_PENDING || currentStatus === ListingStatus.PAYMENT_PENDING;
@@ -103,22 +129,6 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
     // 3. Cabins (Locked until 1 & 2 done?) -> Actually prompt says "Cabin Management section must remain locked... Complete details... to add cabins"
     // 4. Payment & Submit
 
-    // Image Handling
-    const [images, setImages] = useState<string[]>([]);
-    useEffect(() => {
-        if (venueFormData.images) {
-            try {
-                const parsed = JSON.parse(venueFormData.images);
-                if (Array.isArray(parsed)) setImages(parsed);
-            } catch (e) {
-                // Legacy support
-                if (!images.length && venueFormData.imageUrl) setImages([venueFormData.imageUrl]);
-            }
-        } else if (venueFormData.imageUrl && images.length === 0) {
-            setImages([venueFormData.imageUrl]);
-        }
-    }, [venueFormData.images, venueFormData.imageUrl]);
-
     const handleCreateOrUpdateVenue = async (nextStep?: number) => {
         // Validation for Step 1
         if (!venueFormData.name || !venueFormData.address || !venueFormData.city || !venueFormData.contactPhone || !venueFormData.priceStart) {
@@ -134,18 +144,25 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
 
         try {
             if (!venue) {
-                await onCreateRoom(dataToSave);
+                const newRoom = await onCreateRoom(dataToSave) as ReadingRoom;
                 toast.success('Venue created successfully!');
+                // Navigate to the newly created room's page
+                if (newRoom?.id) {
+                    navigate(`/admin/venue/${newRoom.id}`);
+                } else {
+                    // Fallback: reload to get the new room
+                    setTimeout(() => window.location.reload(), 500);
+                }
             } else {
                 await onUpdateRoom(dataToSave);
                 toast.success('Changes saved successfully!');
-            }
-
-            if (nextStep) {
-                setStep(nextStep);
-            } else if (isLive) {
-                // In live mode, refresh to show updated data
-                setTimeout(() => window.location.reload(), 500);
+                
+                if (nextStep) {
+                    setStep(nextStep);
+                } else if (isLive) {
+                    // In live mode, refresh to show updated data
+                    setTimeout(() => window.location.reload(), 500);
+                }
             }
         } catch (error) {
             toast.error('Failed to save changes. Please try again.');
@@ -179,7 +196,7 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
         }
         
         // Validate
-        if (images.length < 4) {
+        if (displayImages.length < 4) {
             alert("Please upload at least 4 images before proceeding.");
             return;
         }
@@ -210,17 +227,11 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
 
     // --- Cabin Management State ---
     const [isCabinModalOpen, setIsCabinModalOpen] = useState(false);
-    const [cabinFormData, setCabinFormData] = useState<Partial<Cabin>>({
-        number: '', floor: 1, price: venue?.priceStart || 5000, status: CabinStatus.AVAILABLE, amenities: ['WiFi', 'AC'], zone: undefined, rowLabel: ''
-    });
     const [editingCabinId, setEditingCabinId] = useState<string | null>(null);
     const [selectedCabins, setSelectedCabins] = useState<Set<string>>(new Set());
 
     // Batch Generator State
     const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
-    const [batchConfig, setBatchConfig] = useState({
-        floor: 1, startNum: 1, endNum: 20, price: venue?.priceStart || 5000, amenities: ['WiFi', 'AC'] as string[], prefix: '', zone: 'MIDDLE' as 'FRONT' | 'MIDDLE' | 'BACK'
-    });
 
     // --- Boost/Feature State ---
     const [isBoostModalOpen, setIsBoostModalOpen] = useState(false);
@@ -376,20 +387,20 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
                 Venue Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 space-y-2">
-                <Input label="Venue Name *" value={venueFormData.name || ''} onChange={(e) => setVenueFormData({ ...venueFormData, name: e.target.value })} disabled={isReadOnly} required />
-                <Input label="Contact Phone *" value={venueFormData.contactPhone || ''} onChange={(e) => setVenueFormData({ ...venueFormData, contactPhone: e.target.value })} disabled={isReadOnly} required />
+                <Input label="Venue Name *" value={displayFormData.name || ''} onChange={(e) => setVenueFormData({ ...venueFormData, name: e.target.value })} disabled={isReadOnly} required />
+                <Input label="Contact Phone *" value={displayFormData.contactPhone || ''} onChange={(e) => setVenueFormData({ ...venueFormData, contactPhone: e.target.value })} disabled={isReadOnly} required />
 
                 {/* Location Selector - Cascading State > City > Locality */}
                 <div className="md:col-span-2">
                     <LocationSelector
                         value={{
-                            state: venueFormData.state || '',
-                            city: venueFormData.city || '',
-                            locality: venueFormData.locality,
-                            pincode: venueFormData.pincode,
-                            address: venueFormData.address,
-                            latitude: venueFormData.latitude,
-                            longitude: venueFormData.longitude
+                            state: displayFormData.state || '',
+                            city: displayFormData.city || '',
+                            locality: displayFormData.locality,
+                            pincode: displayFormData.pincode,
+                            address: displayFormData.address,
+                            latitude: displayFormData.latitude,
+                            longitude: displayFormData.longitude
                         }}
                         onChange={(locationData: LocationData) => {
                             setVenueFormData({
@@ -411,7 +422,7 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
                     />
                 </div>
 
-                <Input label="Base Price (Starting) *" type="number" value={venueFormData.priceStart || ''} onChange={(e) => setVenueFormData({ ...venueFormData, priceStart: Number(e.target.value) })} disabled={isReadOnly} required />
+                <Input label="Base Price (Starting) *" type="number" value={displayFormData.priceStart || ''} onChange={(e) => setVenueFormData({ ...venueFormData, priceStart: Number(e.target.value) })} disabled={isReadOnly} required />
 
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Amenities * (Select at least one)</label>
@@ -419,7 +430,7 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
                         {AMENITY_OPTIONS.map(opt => (
                             <label key={opt} className={`flex items-center space-x-2 cursor-pointer p-2 border rounded-md ${isReadOnly ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
                                 <input type="checkbox"
-                                    checked={venueFormData.amenities?.includes(opt) || false}
+                                    checked={displayFormData.amenities?.includes(opt) || false}
                                     onChange={() => {
                                         if (isReadOnly) return;
                                         const current = venueFormData.amenities || [];
@@ -433,7 +444,7 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
                             </label>
                         ))}
                         {/* Display custom amenities */}
-                        {venueFormData.amenities?.filter(a => !AMENITY_OPTIONS.includes(a)).map(customAmenity => (
+                        {displayFormData.amenities?.filter(a => !AMENITY_OPTIONS.includes(a)).map(customAmenity => (
                             <label key={customAmenity} className={`flex items-center space-x-2 cursor-pointer p-2 border rounded-md bg-indigo-50 ${isReadOnly ? 'bg-gray-100' : 'hover:bg-indigo-100'}`}>
                                 <input type="checkbox"
                                     checked={true}
@@ -507,7 +518,7 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
             {!isReadOnly && <p className="text-sm text-gray-500 mb-4">Upload at least 4 high-quality images of your venue.</p>}
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                {images.map((img, idx) => (
+                {displayImages.map((img, idx) => (
                     <div key={idx} className="relative aspect-video rounded-lg overflow-hidden border group">
                         <img src={img} alt={`Venue ${idx}`} className="w-full h-full object-cover" />
                         {!isReadOnly && (
@@ -530,10 +541,10 @@ export const AdminVenue: React.FC<AdminVenueProps> = ({ state, onCreateRoom, onU
                 <div className="mt-6 flex justify-between">
                     <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
                     <div className="flex gap-2 items-center">
-                        <span className={`text-sm ${images.length >= 4 ? 'text-green-600' : 'text-red-500'}`}>
-                            {images.length} / 4 uploaded
+                        <span className={`text-sm ${displayImages.length >= 4 ? 'text-green-600' : 'text-red-500'}`}>
+                            {displayImages.length} / 4 uploaded
                         </span>
-                        <Button onClick={() => handleCreateOrUpdateVenue(3)} disabled={images.length < 4}>
+                        <Button onClick={() => handleCreateOrUpdateVenue(3)} disabled={displayImages.length < 4}>
                             Save & Continue <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
                     </div>

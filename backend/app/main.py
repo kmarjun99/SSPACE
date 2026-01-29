@@ -24,7 +24,7 @@ app = FastAPI(title="StudySpace Manager API")
 
 # Security Middleware (Add before CORS)
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=300)  # Increased for development
 app.add_middleware(InputValidationMiddleware)
 
 # Global Exception Handler

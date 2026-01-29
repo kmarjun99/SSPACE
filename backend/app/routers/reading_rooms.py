@@ -5,6 +5,7 @@ from sqlalchemy.future import select
 from app.database import get_db
 from app.models.reading_room import ReadingRoom, Cabin, CabinStatus, ListingStatus
 from app.models.city import CitySettings
+from app.models.booking import Booking
 from app.schemas.reading_room import ReadingRoomCreate, ReadingRoomResponse, CabinCreate, ReadingRoomUpdate
 from app.models.user import User, UserRole
 from app.deps import get_current_user, get_current_admin, get_current_user_optional
@@ -277,7 +278,7 @@ async def delete_reading_room(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin)
 ):
-    """Delete a reading room. Only owner can delete. Deletes associated cabins too."""
+    """Delete a reading room. Only owner can delete. Cannot delete if there are any bookings."""
     result = await db.execute(select(ReadingRoom).where(ReadingRoom.id == room_id))
     room = result.scalars().first()
     if not room:
@@ -286,9 +287,22 @@ async def delete_reading_room(
     if room.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this venue")
     
-    # Delete associated cabins first
-    await db.execute(select(Cabin).where(Cabin.reading_room_id == room_id))
+    # Check for any bookings on cabins in this reading room
     cabins = (await db.execute(select(Cabin).where(Cabin.reading_room_id == room_id))).scalars().all()
+    cabin_ids = [c.id for c in cabins]
+    
+    if cabin_ids:
+        bookings_check = await db.execute(
+            select(Booking).where(Booking.cabin_id.in_(cabin_ids))
+        )
+        existing_bookings = bookings_check.scalars().first()
+        if existing_bookings:
+            raise HTTPException(
+                status_code=400, 
+                detail="Cannot delete reading room with existing bookings. Please contact support if you need to remove this listing."
+            )
+    
+    # Delete associated cabins first
     for cabin in cabins:
         await db.delete(cabin)
     
